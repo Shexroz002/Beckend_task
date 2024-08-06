@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from users.serializers import CustomUserSerializer
 from .models import FootballField, FieldImage, Reservation
@@ -12,10 +13,12 @@ class FieldImageSerializers(ModelSerializer):
 
 class FootballFieldSerializers(ModelSerializer):
     images = FieldImageSerializers(many=True, read_only=True)
+    distance = serializers.FloatField(default=0)
 
     class Meta:
         model = FootballField
-        fields = ['id', 'name', 'address', 'contact', 'price_per_hour', 'images', 'owner', 'latitude', 'longitude']
+        fields = ['id', 'name', 'address', 'contact', 'price_per_hour', 'images', 'owner', 'latitude', 'longitude',
+                  'distance']
         extra_kwargs = {
             'owner': {'required': False},
         }
@@ -60,7 +63,10 @@ class ReservationSerializers(ModelSerializer):
         if start_time > end_time:
             raise serializers.ValidationError('End time must be less than start time')
         # check if the reservation already exists
-        if Reservation.objects.filter(start_time=start_time, end_time=end_time, date=date, field=field[0].id).exists():
+        if Reservation.objects.filter(
+                Q(start_time__gte=start_time, end_time__lte=end_time) |
+                Q(start_time__gt=start_time, start_time__lt=end_time) |
+                Q(end_time__gt=start_time, end_time__lt=end_time)):
             raise serializers.ValidationError('Reservation already exists')
         """
         Checks if there is a reservation for the given date and time. If there is, it adds the given field.
@@ -82,7 +88,7 @@ class FootballReservation(ModelSerializer):
 
 
 class ReservationSerializersResponse(ModelSerializer):
-    field = FootballReservation(many=True)
+    # field = FootballReservation(many=True)
 
     class Meta:
         model = Reservation

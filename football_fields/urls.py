@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import FootballCreateView, FootballCreateUpdate, AllFootballFields, ReservationList, CreateReservation, \
-    DeleteReservation
+    DeleteReservation, ListALLReservation
 
 app_name = 'football_fields'
 urlpatterns = [
@@ -10,4 +10,5 @@ urlpatterns = [
     path('reservation/list/', ReservationList.as_view(), name='reservation'),
     path('reservation/create/', CreateReservation.as_view(), name='create_reservation'),
     path('reservation/delete/<int:pk>/', DeleteReservation.as_view(), name='delete_reservation'),
+    path('search',ListALLReservation.as_view(),name="She")
 ]

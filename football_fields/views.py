@@ -1,4 +1,7 @@
 import math
+from datetime import datetime
+
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status, views, response
 from .models import FootballField, Reservation
@@ -101,7 +104,7 @@ def is_float(value):
 
 
 class AllFootballFields(views.APIView):
-    permission_classes = [IsAdminAndUser]
+    permission_classes = [IsAdminAndUser, ]
 
     @swagger_auto_schema(
         operation_description="Get all football fields",
@@ -142,27 +145,34 @@ class AllFootballFields(views.APIView):
     def get(self, request):
         start_time = request.query_params.get('start_time', None)
         end_time = request.query_params.get('end_time', None)
+        # start_time = datetime.strptime(start_time, '%H:%M').time() if start_time is not None else None
+        # end_time = datetime.strptime(end_time, '%H:%M').time() if end_time is not None else None
+        query = Reservation.objects.filter(Q(start_time__gte=end_time) | Q(end_time__lte=start_time)).distinct()
+
         latitude = request.query_params.get('latitude')
         longitude = request.query_params.get('longitude')
-        football_fields = FootballField.objects.all()
-
-        if start_time is not None or end_time is not None:
-            football_fields = football_fields.prefetch_related('reservations').exclude(
-                reservations__start_time=start_time, reservations__end_time=end_time)
         if latitude is not None and longitude is not None:
             if not (is_float(latitude) and is_float(longitude)):
                 return response.Response({'error': 'Latitude and longitude must be float'},
                                          status=status.HTTP_400_BAD_REQUEST)
-            position = (float(latitude), float(longitude))
-            football_fields = sort_by_closest(position, football_fields)
+            football_fields = FootballField.objects.annotate_distance(latitude, longitude).all().order_by('distance')
+        else:
+            football_fields = FootballField.objects.all()
 
+        if start_time is not None or end_time is not None:
+            football_fields = football_fields.prefetch_related('reservations').exclude(
+                Q(reservations__start_time__gte=start_time, reservations__end_time__lte=end_time) |
+                Q(reservations__start_time__gt=start_time, reservations__start_time__lt=end_time) |
+                Q(reservations__end_time__gt=start_time, reservations__end_time__lt=end_time))
         paginator = CustomPagination()
         result_page = paginator.paginate_queryset(football_fields, request)
         serializer = FootballFieldSerializers(result_page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
+
 class DeleteFootballField(views.APIView):
     permission_classes = [IsAdminAndFieldOwner]
+
 
 class CreateReservation(views.APIView):
     permission_classes = [IsUser]
@@ -247,3 +257,22 @@ class ReservationList(views.APIView):
         result_page = paginator.paginate_queryset(reservations, request)
         serializer = ReservationSerializersResponse(result_page, many=True)
         return paginator.get_paginated_response(serializer.data)
+
+
+class ListALLReservation(views.APIView):
+    permission_classes = [IsAdminAndUser]
+
+    def get(self, request):
+        start_time = request.query_params.get('start_time', None)
+        end_time = request.query_params.get('end_time', None)
+        if start_time is not None and end_time is not None:
+
+            list_reservation = Reservation.objects.exclude(Q(start_time__gte=start_time, end_time__lte=end_time) |
+                                                           Q(start_time__lt=start_time, start_time__gt=end_time) |
+                                                           Q(end_time__lt=start_time, end_time__gt=end_time))
+
+        else:
+            list_reservation = Reservation.objects.all()
+
+        return response.Response(ReservationSerializersResponse(list_reservation, many=True).data,
+                                 status=status.HTTP_200_OK)

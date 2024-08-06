@@ -1,6 +1,17 @@
+import math
+
 from django.db import models
 from users.models import CustomUser
+from .query_set import FootballFieldQuerySet
 from .validates_function import price_per_hour_validator, validate_owner, validate_image_size
+
+
+class FootballFieldManager(models.Manager):
+    def get_queryset(self):
+        return FootballFieldQuerySet(self.model, using=self._db)
+
+    def annotate_distance(self, target_latitude, target_longitude):
+        return self.get_queryset().annotate_distance(target_latitude, target_longitude)
 
 
 class FootballField(models.Model):
@@ -12,6 +23,7 @@ class FootballField(models.Model):
                               validators=[validate_owner])
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    objects = FootballFieldManager()
 
     def __str__(self):
         return self.name
@@ -25,6 +37,11 @@ class FootballField(models.Model):
             models.Index(fields=['name']),
             models.Index(fields=['address']),
         ]
+
+    def calculate_distance(self, a_latitude, b_longitude):
+        if a_latitude is None or b_longitude is None:
+            return 0
+        return math.sqrt((a_latitude - self.latitude) ** 2 + (b_longitude - self.longitude) ** 2)
 
 
 class FieldImage(models.Model):
@@ -59,4 +76,3 @@ class Reservation(models.Model):
             models.Index(fields=['start_time']),
             models.Index(fields=['end_time']),
         ]
-
