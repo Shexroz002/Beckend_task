@@ -145,10 +145,6 @@ class AllFootballFields(views.APIView):
     def get(self, request):
         start_time = request.query_params.get('start_time', None)
         end_time = request.query_params.get('end_time', None)
-        # start_time = datetime.strptime(start_time, '%H:%M').time() if start_time is not None else None
-        # end_time = datetime.strptime(end_time, '%H:%M').time() if end_time is not None else None
-        query = Reservation.objects.filter(Q(start_time__gte=end_time) | Q(end_time__lte=start_time)).distinct()
-
         latitude = request.query_params.get('latitude')
         longitude = request.query_params.get('longitude')
         if latitude is not None and longitude is not None:
